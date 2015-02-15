@@ -1,0 +1,107 @@
+<html>
+<head></head>
+<body>
+<style>
+audio {
+   display:none;
+}
+</style>
+<script>
+var server = 'http://localhost:2222'
+function getTableNames() {
+       var contents = document.getElementById( "contents" );
+}
+function addTable() {
+   var tableName = document.getElementById( "queryBox" ).value; 
+   if( tableName ) {
+      var tables = document.getElementById( "tables" );
+      for( var i = 0; i < tables.childElementCount; i++ ) {
+         if( tables.childNodes[ i ].id === tableName ) {
+            console.log( tableName + ' is already in view' );
+            return;
+         }
+      }
+      var http = new XMLHttpRequest();
+      http.open( 'GET', server + '/' + tableName, false ); //syncronous
+      http.send();
+      if( http.responseText ) {
+         console.log( tableName + ' created' );
+         var tableObj = JSON.parse( http.responseText );
+         var tableDOM = document.createElement( "table" );
+         tableDOM.id = tableName;
+         var headingRow = document.createElement( "tr" );
+         for( key in tableObj[ 0 ] ) {
+            var heading = document.createElement( "th" );
+            heading.innerHTML =  key;
+            headingRow.appendChild( heading );
+         }
+         tableDOM.appendChild( headingRow );
+         for( rowObj in tableObj ) {
+            var rowDOM = document.createElement( "tr" );
+            for( e in tableObj[ rowObj ] ) {
+               var elemDOM = document.createElement( "td" );
+               var elemData = tableObj[ rowObj ][ e ];
+               if( e === 'oID' ) {
+                  rowDOM.id = tableName + elemData 
+               }
+               elemDOM.innerHTML = elemData;
+               rowDOM.appendChild( elemDOM );
+            }
+            tableDOM.appendChild( rowDOM );
+         }
+         tables.appendChild( tableDOM );
+         
+         // table is now set
+         var source = new EventSource( '/stream/' + tableName );
+         source.addEventListener('message', function(e) {
+           console.log( 'message recieved' );
+           var rowObj = JSON.parse( e.data );
+           var oID = rowObj[ 'oID' ];
+           var row = document.getElementById( tableName + oID );
+           if( row ) {
+              var j = 0;
+              for( elem in rowObj ) { //assumes updates are in same order as original data
+                row.childNodes[ j++ ].innerHTML = rowObj[ elem ];
+              }
+           } else {
+              var row = document.createElement( 'tr' );
+              for( elem in rowObj ) {
+                 if( elem === 'oID' ) {
+                    row.id = tableName + rowObj[ elem ];
+                 }
+                 td = document.createElement( 'td' );
+                 td.innerHTML = rowObj[ elem ];
+                 row.appendChild( td );
+              }
+              tableDOM.appendChild( row ); 
+           }
+         }, false);
+         source.addEventListener('open', function(e) {
+           console.log( tableName + ' stream opened' );
+         }, false);
+         source.addEventListener('error', function(e) {
+           if (e.readyState == EventSource.CLOSED) {
+              console.log( 'err' );
+           }
+         }, false);
+      } else {
+         alert( tableName + ' does not exist' );
+      }
+   }
+}
+</script> 
+   <h1>Hi I'm Legolas, a web client for Arrow</h1>
+   <img src="http://images6.fanpop.com/image/polls/1286000/1286831_1380796791846_full.jpg" alt="so smexy">
+   <audio controls autoplay loop>
+      <source src="http://a.tumblr.com/tumblr_lqx9kdbQg21r1ytemo1.mp3" type="audio/mpeg">
+    </audio>
+      <br>
+	<!-- <input type="button" name="getTableNames" value="Get Table Names" onclick="getTableNames();"> -->
+  	
+	<p>Table name: <input type="text" id="queryBox" name="tableName"><br>
+	<input type="button" name="getTableButton" value="Add Table" onclick="addTable();">
+
+	<div id="tables"></div>
+
+</body>
+</html>
